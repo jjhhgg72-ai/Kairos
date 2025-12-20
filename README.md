@@ -1,4 +1,3 @@
-````md
 # :로켓: SAFRS AGV Robotics Platform — Camera Pi Overview
 **Unified Multi-Raspberry-Pi Cluster for an Autonomous Ground Vehicle**
 The SAFRS AGV platform is a **distributed robotics system** using four Raspberry Pi units.
@@ -263,5 +262,4 @@ License: MIT (pending finalization)
 **지윤목장**
 SAFRS Robotics Team
 
-```
 ```
