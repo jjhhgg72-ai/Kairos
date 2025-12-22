@@ -69,7 +69,7 @@ camera_client_cluster2/
 │   └── monkey_classifier_quant_int8.tflite # Classification Model
 │
 ├── src/
-│   └── camera_node.py                      # Main Application (Provided Code)
+│   └── camera_client_node3.py              # Main Application (Provided Code)
 │
 ├── package.xml
 └── setup.py
@@ -105,7 +105,7 @@ Hardcoded paths in `CameraNode`:
 ### Launch Camera Node
 
 ```bash
-ros2 run camera_client_cluster2 camera_node
+ros2 run camera_client_cluster2 camera_client_node3
 
 ```
 
