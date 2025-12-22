@@ -10,7 +10,7 @@ This node directly interfaces with a **USB Camera**, utilizes **TensorFlow Lite 
 
 ## 🧠 Role in SAFRS System
 
-A-Pi acts as the **"Eyes" of the system**.
+Canera Raspberry Pi acts as the **"Eyes" of the system**.
 
 ### Responsibilities
 
