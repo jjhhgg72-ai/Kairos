@@ -1,3 +1,5 @@
+---
+
 # SAFRS Camera Raspberry Pi
 
 ## AI Vision & Target Tracking Node (UDP Cluster Version)
@@ -10,7 +12,7 @@ This node directly interfaces with a **USB Camera**, utilizes **TensorFlow Lite 
 
 ## 🧠 Role in SAFRS System
 
-Canera Raspberry Pi acts as the **"Eyes" of the system**.
+Camera Raspberry Pi acts as the **"Eyes" of the system**.
 
 ### Responsibilities
 
@@ -18,11 +20,13 @@ Canera Raspberry Pi acts as the **"Eyes" of the system**.
 * Perform **Object Detection** (EfficientDet-Lite1) to find potential targets
 * Perform **Classification** (MobileNet + Color Heuristics) to distinguish **Ally vs. Enemy**
 * Calculate **visual error (X/Y offset)** from the image center
-* Publish:
-* `/error_xy` (Targeting correction vector)
-* `/detect` (Target information)
-* `/end` (Task completion signal)
+* **Publish Data:**
 
+| Topic Name | Description |
+| --- | --- |
+| `/error_xy` | Targeting correction vector |
+| `/detect` | Target information |
+| `/end` | Task completion signal |
 
 * Manage **Camera State (ON/OFF)** based on System Mode
 
@@ -58,7 +62,7 @@ Canera Raspberry Pi acts as the **"Eyes" of the system**.
 
 ## 📁 Directory Structure
 
-```
+```text
 camera_client_cluster2/
 ├── model/
 │   ├── EfficientDet-Lite1.tflite           # Object Detection Model
@@ -115,7 +119,7 @@ If the camera is connected correctly, you should see:
 
 ## 🧩 Internal Control Flow
 
-```
+```text
 Camera Frame (640x480)
     ↓
 Resize (to Model Input, e.g., 384x384)
@@ -177,3 +181,5 @@ License: MIT
 **지윤목장**
 
 SAFRS Robotics Team
+
+---
