@@ -1,8 +1,8 @@
-# SAFRS Camera Raspberry Pi (A-Pi)
+# SAFRS Camera Raspberry Pi
 
 ## AI Vision & Target Tracking Node (UDP Cluster Version)
 
-The **Camera Raspberry Pi (A-Pi)** is responsible for **visual perception, object detection, and target tracking** within the SAFRS AGV UDP-based distributed robotics system.
+The **Camera Raspberry Pi** is responsible for **visual perception, object detection, and target tracking** within the SAFRS AGV UDP-based distributed robotics system.
 
 This node directly interfaces with a **USB Camera**, utilizes **TensorFlow Lite (TFLite)** for efficient edge inference, and calculates **targeting error vectors** to guide the turret or robot chassis, while publishing detection status and end signals back to the cluster.
 
