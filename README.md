@@ -1,76 +1,54 @@
----
-
-# SAFRS Camera Raspberry Pi
-
-## AI Vision & Target Tracking Node (UDP Cluster Version)
-
-The **Camera Raspberry Pi** is responsible for **visual perception, object detection, and target tracking** within the SAFRS AGV UDP-based distributed robotics system.
-
-This node directly interfaces with a **USB Camera**, utilizes **TensorFlow Lite (TFLite)** for efficient edge inference, and calculates **targeting error vectors** to guide the turret or robot chassis, while publishing detection status and end signals back to the cluster.
+네, 요청하신 대로 코드를 완벽하게 반영하여 작성된 **README.md** 파일의 전문입니다. 이 내용을 그대로 `README.md` 파일에 복사하여 사용하시면 됩니다.
 
 ---
 
-## 🧠 Role in SAFRS System
+# SAFRS Camera Raspberry Pi (Vision Node)
 
-Camera Raspberry Pi acts as the **"Eyes" of the system**.
+This package implements the **Visual Perception & Tracking Node** for the SAFRS (SAFRS AGV Fire Response System) robot. It runs on a Raspberry Pi 4, interfacing with a USB camera to perform object detection, Ally/Enemy classification, and target tracking.
 
-### Responsibilities
+## 📌 Overview
 
-* Capture video frames from **USB Camera** (640x480 @ 30fps)
-* Perform **Object Detection** (EfficientDet-Lite1) to find potential targets
-* Perform **Classification** (MobileNet + Color Heuristics) to distinguish **Ally vs. Enemy**
-* Calculate **visual error (X/Y offset)** from the image center
-* **Publish Data:**
+The **Camera Node** serves as the "eyes" of the robot. It operates as a ROS 2 node that:
 
-| Topic Name | Description |
-| --- | --- |
-| `/error_xy` | Targeting correction vector |
-| `/detect` | Target information |
-| `/end` | Task completion signal |
-
-* Manage **Camera State (ON/OFF)** based on System Mode
+1. Captures video frames from a USB Webcam.
+2. Detects objects using **EfficientDet-Lite1**.
+3. Classifies targets (Ally vs. Enemy) using a hybrid approach of **MobileNet (TFLite)** and **HSV Color Analysis**.
+4. Calculates the targeting error vector to guide the turret.
+5. Publishes tracking status and completion signals to the main system.
 
 ---
 
-## 📡 Communication Overview
+## ⚙️ System Requirements
 
-### Subscribed Topics
+### Hardware
 
-* `/mode` (`system_interfaces/msg/SystemMode`)
-* Controls FSM (BOOT, STANDBY, TRACK_ALLY, TRACK_ENEMY, NAVI)
+* **Computer:** Raspberry Pi 4 (ARM64) or compatible Linux machine.
+* **Camera:** Standard USB Webcam (mounted as `/dev/video0`).
 
+### Software
 
-
-### Published Topics
-
-* `/error_xy` (`geometry_msgs/msg/Vector3`)
-* `x`: Horizontal error (pixels from center)
-* `y`: Vertical error (pixels from center)
-* `z`: Status flag (0.0 = Tracking, -1.0 = Lost)
-
-
-* `/detect` (`system_interfaces/msg/Detect`)
-* Label, Center X, Center Y
-
-
-* `/end` (`system_interfaces/msg/EndSignal`)
-* Triggered when target is centered and confidence is high
+* **OS:** Ubuntu 20.04 / 22.04 (LTS)
+* **Middleware:** ROS 2 (Foxy, Humble, or Iron)
+* **Python Dependencies:**
+* `opencv-python`
+* `numpy`
+* `tensorflow` (Windows) OR `tflite_runtime` (Linux/Raspberry Pi)
 
 
 
 ---
 
-## 📁 Directory Structure
+## 📂 Directory Structure & Model Setup
+
+⚠️ **Important:** The Python script currently uses **hardcoded absolute paths** for the TFLite models. You must ensure your directory structure matches the code or update the `DET_MODEL_PATH` and `CLASS_MODEL_PATH` variables in `camera_client_node3.py`.
 
 ```text
-camera_client_cluster2/
+/home/ubuntu/ros2_ws/src/camera_client_cluster2/camera_client_cluster2/
 ├── model/
 │   ├── EfficientDet-Lite1.tflite           # Object Detection Model
 │   └── monkey_classifier_quant_int8.tflite # Classification Model
-│
 ├── src/
-│   └── camera_client_node3.py              # Main Application (Provided Code)
-│
+│   └── camera_client_node3.py              # Main ROS 2 Node
 ├── package.xml
 └── setup.py
 
@@ -78,108 +56,122 @@ camera_client_cluster2/
 
 ---
 
-## ⚙️ Configuration & Constants
+## 📡 ROS 2 Interfaces
 
-### 1️⃣ Model Configuration
+### Subscribed Topics
 
-Hardcoded paths in `CameraNode`:
+| Topic Name | Message Type | Description |
+| --- | --- | --- |
+| `/mode` | `std_msgs/String` | Controls the internal FSM state.<br>
 
-* **Detection:** `EfficientDet-Lite1.tflite` (Input: Dynamic/384x384)
-* **Classification:** `monkey_classifier_quant_int8.tflite` (Input: 224x224)
+<br>**Valid Inputs:** `"BOOT"`, `"NAVI"`, `"STANDBY"`, `"TRACK_ALLY"`, `"TRACK_ENEMY"` |
 
-### 2️⃣ Camera Settings
+### Published Topics
 
-* Resolution: **640x480**
-* Exposure: **-5** (Darkened for better color segmentation)
-* Auto Exposure: **Enabled**
+| Topic Name | Message Type | Data Format & Description |
+| --- | --- | --- |
+| `/error_xy` | `geometry_msgs/Vector3` | **Targeting Error Vector**<br>
 
-### 3️⃣ Logic Thresholds
+<br>`x`: Horizontal pixel offset from center.<br>
 
-* `CENTER_THRESHOLD`: **25 pixels** (Tolerance for "aimed" state)
-* `CAMERA_OFF_DELAY`: **5.0 seconds** (Cool-down before releasing resource)
+<br>`y`: Vertical pixel offset from center.<br>
+
+<br>`z`: Status (`0.0` = Tracking, `-1.0` = No Target). |
+| `/detect` | `std_msgs/String` | **Detection Info**<br>
+
+<br>Format: `"LABEL,cx,cy,conf"`<br>
+
+<br>Example: `"ENEMY,310.5,240.0,0.95"` |
+| `/end` | `std_msgs/String` | **Task Completion Signal**<br>
+
+<br>Payload: `"end"`<br>
+
+<br>Published when the target is centered (`err_x < 25`) and confidence is high (`> 0.8`). |
 
 ---
 
-## 🚀 How to Run
+## 🧠 Logic & Algorithm
 
-### Launch Camera Node
+### 1. Hybrid Classification (Color + AI)
+
+To ensure robustness against lighting and model errors, the node uses a priority system:
+
+1. **Blue Heuristic (Ally):**
+* If `Blue Pixel Ratio > 5%` AND `Blue > Red`, force label **"ALLY"**.
+
+
+2. **Red Heuristic (Enemy):**
+* If `Red Pixel Ratio > 8%`, force label **"ENEMY"**.
+
+
+3. **AI Inference:**
+* If color conditions are not met, use the **MobileNet Int8** model result.
+* If `confidence < 0.6`, result is **"unknown"**.
+
+
+
+### 2. Camera FSM (Finite State Machine)
+
+* **BOOT / NAVI:** Camera is turned **OFF** (after a 5-second delay in NAVI) to save resources.
+* **STANDBY / TRACK_***: Camera is turned **ON** immediately. Exposure is set to **-5** to darken the background and highlight LED markers.
+
+---
+
+## 🚀 Usage
+
+### 1. Build the Package
+
+```bash
+cd ~/ros2_ws
+colcon build --packages-select camera_client_cluster2
+source install/setup.bash
+
+```
+
+### 2. Run the Node
 
 ```bash
 ros2 run camera_client_cluster2 camera_client_node3
 
 ```
 
-If the camera is connected correctly, you should see:
+### 3. Test with ROS 2 CLI
 
-* `[INFO] CameraNode started...`
-* `[INFO] Camera ON` (When mode switches to STANDBY/TRACK)
-* A GUI window "Camera View" showing the feed with bounding boxes.
+You can simulate the system controller by publishing a mode command:
 
----
+```bash
+# Turn on camera and start tracking enemies
+ros2 topic pub /mode std_msgs/msg/String "data: 'TRACK_ENEMY'" --once
 
-## 🧩 Internal Control Flow
-
-```text
-Camera Frame (640x480)
-    ↓
-Resize (to Model Input, e.g., 384x384)
-    ↓
-TFLite Inference (EfficientDet)
-    ↓
-Bounding Box Extraction
-    ↓
-ROI Crop & Color Analysis (Red/Blue Ratio)
-    ↓
-Secondary Inference (MobileNet Classifier)
-    ↓
-Logic: Determine ALLY / ENEMY
-    ↓
-Calculate Error (Center - Object)
-    ↓
-Publish /error_xy & /detect
+# Return to Navigation mode (Camera will turn off after 5s)
+ros2 topic pub /mode std_msgs/msg/String "data: 'NAVI'" --once
 
 ```
 
 ---
 
-## ⚠️ Notes & Best Practices
+## 🔧 Configuration Parameters
 
-* **Lighting matters:** The camera exposure is set low (-5) to highlight colored LEDs/markers. Ensure consistent lighting.
-* **Thread Safety:** Image capture and Inference run in separate threads (`capture_loop`, `inference_loop`) using `threading.Lock()` to prevent race conditions.
-* **Model Paths:** Ensure absolute paths to `.tflite` files are correct in the script.
-* **Performance:**
-* Raspberry Pi 4: Expect ~5-10 FPS inference.
-* PC/Jetson: Expect 30+ FPS.
+The following constants are defined at the top of `camera_client_node3.py` and can be modified:
 
-
+* **`CENTER_THRESHOLD`** (Default: `25`): The pixel distance from the center to consider the target "locked on".
+* **`CAMERA_OFF_DELAY_SEC`** (Default: `5.0`): Time to wait before turning off the camera in NAVI mode.
+* **`CLASS_IMG_SIZE`** (Default: `(224, 224)`): Input size for the classification model.
+* **`Camera Settings`**: Resolution is fixed at **640x480**, Exposure at **-5**.
 
 ---
 
-## 🔧 Hardware Assumptions
+## ⚠️ Troubleshooting
 
-* **Camera:** Standard USB Webcam (Video0)
-* **Compute:** Raspberry Pi 4 or equivalent (ARM64)
-* **Dependencies:**
-* `tflite_runtime` or `tensorflow`
-* `opencv-python`
-* `ros2-humble` (or compatible)
-
-
+* **"Camera OFF" stays on:** Ensure the `/mode` topic is receiving data. The node waits for a mode change to initialize.
+* **Low FPS:** Running TFLite on a CPU (Raspberry Pi) typically yields 5-10 FPS. Ensure proper cooling for the Pi.
+* **FileNotFoundError:** Double-check the absolute paths in `DET_MODEL_PATH` and `CLASS_MODEL_PATH`.
 
 ---
 
 ## 📜 License
 
-SAFRS Robotics Platform
+**SAFRS Robotics Team**
 
-License: MIT
-
----
-
-## 🙋 Maintainer
-
-**지윤목장**
-
-SAFRS Robotics Team
-
----
+* **Maintainer:** 지윤목장 (Jiyun Mokjang)
+* **License:** MIT
