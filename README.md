@@ -1,5 +1,3 @@
-네, 요청하신 대로 코드를 완벽하게 반영하여 작성된 **README.md** 파일의 전문입니다. 이 내용을 그대로 `README.md` 파일에 복사하여 사용하시면 됩니다.
-
 ---
 
 # SAFRS Camera Raspberry Pi (Vision Node)
